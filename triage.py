@@ -25,7 +25,7 @@ def load_grype_results(path="grype-results.json"):
     return vulns
 
 def call_claude(vulns):
-    api_key = os.environ["ANTHROPIC_API_KEY"]
+    api_key = os.environ["GROQ_API_KEY"]
     vuln_text = json.dumps(vulns, indent=2)
 
     prompt = f"""You are a security engineer reviewing vulnerability scan results for a Node.js web application.
@@ -51,24 +51,23 @@ Numbered list of concrete next steps in priority order.
 Be specific and practical. Avoid generic security advice."""
 
     body = json.dumps({
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "mixtral-8x7b-32768",
         "max_tokens": 1000,
         "messages": [{"role": "user", "content": prompt}]
     }).encode()
 
     req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
+        "https://api.groq.com/openai/v1/chat/completions",
         data=body,
         headers={
             "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
+            "Authorization": f"Bearer {api_key}"
         }
     )
     try:
         with urllib.request.urlopen(req) as resp:
             result = json.loads(resp.read())
-        return result["content"][0]["text"]
+        return result["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
         print(f"API Error: {e.code} - {error_body}", file=sys.stderr)
