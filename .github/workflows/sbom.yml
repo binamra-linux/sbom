@@ -39,7 +39,7 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
             | sh -s -- -b /usr/local/bin
 
-       - name: Scan SBOM for vulnerabilities
+      - name: Scan SBOM for vulnerabilities
         run: |
           grype sbom:sbom.json -o json > grype-results.json
           COUNT=$(cat grype-results.json | python3 -c "
@@ -71,7 +71,7 @@ jobs:
             print(f'  {sev}: {counts.get(sev,0)}')
           print(f'  Total: {len(matches)}')
           "
-      # NEW: run Claude triage
+
       - name: Run Claude triage
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
