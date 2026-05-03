@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: ["*"]
 
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
 jobs:
   sbom:
     runs-on: ubuntu-latest
@@ -29,17 +34,15 @@ jobs:
           print(len(d.get('packages',[])))
           "
 
-      # NEW: install Grype scanner
       - name: Install Grype
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
             | sh -s -- -b /usr/local/bin
 
-      # NEW: scan the SBOM for vulnerabilities
       - name: Scan SBOM for vulnerabilities
         run: |
           grype sbom:sbom.json -o json > grype-results.json
-          echo "Scan complete. Vulnerability summary:"
+          echo "Vulnerability summary:"
           cat grype-results.json | python3 -c "
           import json,sys
           d=json.load(sys.stdin)
@@ -48,8 +51,15 @@ jobs:
           counts=Counter(m['vulnerability']['severity'] for m in matches)
           for sev in ['Critical','High','Medium','Low','Negligible']:
             print(f'  {sev}: {counts.get(sev,0)}')
-          print(f'  Total: {len(matches)}')
           "
+
+      # NEW: run Claude triage
+      - name: Run Claude triage
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python3 triage.py
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
