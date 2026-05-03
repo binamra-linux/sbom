@@ -51,7 +51,7 @@ Numbered list of concrete next steps in priority order.
 Be specific and practical. Avoid generic security advice."""
 
     body = json.dumps({
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-3-5-sonnet-20241022",
         "max_tokens": 1000,
         "messages": [{"role": "user", "content": prompt}]
     }).encode()
@@ -65,9 +65,14 @@ Be specific and practical. Avoid generic security advice."""
             "anthropic-version": "2023-06-01"
         }
     )
-    with urllib.request.urlopen(req) as resp:
-        result = json.loads(resp.read())
-    return result["content"][0]["text"]
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+        return result["content"][0]["text"]
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print(f"API Error: {e.code} - {error_body}", file=sys.stderr)
+        raise
 
 def post_pr_comment(report):
     token = os.environ.get("GITHUB_TOKEN")
