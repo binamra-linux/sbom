@@ -19,6 +19,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Node dependencies
+        run: npm install --package-lock-only && npm ci
+        # This creates node_modules/ so Syft and Grype can see the packages
+
       - name: Install Syft
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
@@ -42,24 +51,6 @@ jobs:
       - name: Scan SBOM for vulnerabilities
         run: |
           grype sbom:sbom.json -o json > grype-results.json
-          COUNT=$(cat grype-results.json | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          print(len(d.get('matches',[])))
-          ")
-          echo "Vulnerabilities from SBOM scan: $COUNT"
-
-          if [ "$COUNT" -eq "0" ]; then
-            echo "SBOM scan found 0 — trying direct directory scan..."
-            grype dir:. -o json > grype-results.json
-            COUNT2=$(cat grype-results.json | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          print(len(d.get('matches',[])))
-          ")
-            echo "Direct scan found: $COUNT2 vulnerabilities"
-          fi
-
           echo "Final vulnerability summary:"
           cat grype-results.json | python3 -c "
           import json,sys
