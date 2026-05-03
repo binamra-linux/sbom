@@ -22,7 +22,6 @@ jobs:
       - name: Generate SBOM
         run: |
           syft . -o spdx-json=sbom.json
-          echo "SBOM generated successfully"
           echo "Total packages found:"
           cat sbom.json | python3 -c "
           import json,sys
@@ -30,8 +29,36 @@ jobs:
           print(len(d.get('packages',[])))
           "
 
+      # NEW: install Grype scanner
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      # NEW: scan the SBOM for vulnerabilities
+      - name: Scan SBOM for vulnerabilities
+        run: |
+          grype sbom:sbom.json -o json > grype-results.json
+          echo "Scan complete. Vulnerability summary:"
+          cat grype-results.json | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          matches=d.get('matches',[])
+          from collections import Counter
+          counts=Counter(m['vulnerability']['severity'] for m in matches)
+          for sev in ['Critical','High','Medium','Low','Negligible']:
+            print(f'  {sev}: {counts.get(sev,0)}')
+          print(f'  Total: {len(matches)}')
+          "
+
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom.json
+
+      - name: Upload Grype results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grype-results
+          path: grype-results.json
