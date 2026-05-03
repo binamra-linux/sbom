@@ -39,10 +39,28 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
             | sh -s -- -b /usr/local/bin
 
-      - name: Scan SBOM for vulnerabilities
+       - name: Scan SBOM for vulnerabilities
         run: |
           grype sbom:sbom.json -o json > grype-results.json
-          echo "Vulnerability summary:"
+          COUNT=$(cat grype-results.json | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print(len(d.get('matches',[])))
+          ")
+          echo "Vulnerabilities from SBOM scan: $COUNT"
+
+          if [ "$COUNT" -eq "0" ]; then
+            echo "SBOM scan found 0 — trying direct directory scan..."
+            grype dir:. -o json > grype-results.json
+            COUNT2=$(cat grype-results.json | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print(len(d.get('matches',[])))
+          ")
+            echo "Direct scan found: $COUNT2 vulnerabilities"
+          fi
+
+          echo "Final vulnerability summary:"
           cat grype-results.json | python3 -c "
           import json,sys
           d=json.load(sys.stdin)
@@ -51,8 +69,8 @@ jobs:
           counts=Counter(m['vulnerability']['severity'] for m in matches)
           for sev in ['Critical','High','Medium','Low','Negligible']:
             print(f'  {sev}: {counts.get(sev,0)}')
+          print(f'  Total: {len(matches)}')
           "
-
       # NEW: run Claude triage
       - name: Run Claude triage
         env:

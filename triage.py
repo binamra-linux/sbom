@@ -5,8 +5,11 @@ import urllib.request
 
 def load_grype_results(path="grype-results.json"):
     with open(path) as f:
-        data = json.load(f)
+        raw = f.read()
+    print(f"Raw grype-results.json size: {len(raw)} bytes")
+    data = json.loads(raw)
     matches = data.get("matches", [])
+    print(f"Matches found in JSON: {len(matches)}")
     vulns = []
     for m in matches:
         v = m.get("vulnerability", {})
@@ -76,7 +79,9 @@ def post_pr_comment(report):
         print(report)
         return
 
-    body = json.dumps({"body": f"## SBOM Security Triage Report\n\n{report}"}).encode()
+    body = json.dumps({
+        "body": f"## SBOM Security Triage Report\n\n{report}"
+    }).encode()
     req = urllib.request.Request(
         f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",
         data=body,
@@ -92,6 +97,12 @@ def post_pr_comment(report):
 if __name__ == "__main__":
     print("Loading Grype results...")
     vulns = load_grype_results()
+
+    if len(vulns) == 0:
+        print("No vulnerabilities found — skipping Claude triage.")
+        print("Check that package.json has old dependency versions.")
+        sys.exit(0)
+
     print(f"Found {len(vulns)} vulnerabilities. Sending to Claude...")
     report = call_claude(vulns)
     print("Report generated:")
